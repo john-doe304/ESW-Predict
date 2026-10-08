@@ -15,21 +15,21 @@ from tqdm import tqdm
 import numpy as np
 
 
-# 添加 CSS 样式
+# 添加 CSS 样式（已修复负边距导致的遮挡问题）
 st.markdown(
     """
     <style>
     .stApp {
         border: 2px solid #808080;
         border-radius: 20px;
-        margin: 50px auto;
-        max-width: 42%;
+        margin: 30px auto;
+        max-width: 45%;
         background-color: #f9f9f9f9;
         padding: 20px;
         box-sizing: border-box;
     }
     .rounded-container h2 {
-        margin-top: -80px;
+        margin-top: 10px;
         text-align: center;
         background-color: #e0e0e0e0;
         padding: 10px;
@@ -37,10 +37,10 @@ st.markdown(
     }
     .rounded-container blockquote {
         text-align: left;
-        margin: 20px auto;
+        margin: 15px auto;
         background-color: #f0f0f0;
         padding: 10px;
-        font-size: 1.1em;
+        font-size: 1.05em;
         border-radius: 10px;
     }
     .stMetric {
@@ -60,7 +60,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 侧边栏或主页面选择：体系与预测目标
+# 选择体系与预测目标
 col1, col2 = st.columns(2)
 with col1:
     electrolyte_system = st.selectbox(
@@ -78,16 +78,16 @@ if electrolyte_system == "Lithium (Li-ion)":
     system_name = "Li-ion Solid Electrolytes"
     example_formula = "e.g., Ba2Li3(PO3)7, Li7La3Zr2O12, Li10GeP2S12"
     if prediction_target == "Oxidation Potential":
-        model_path = "./ag-li-oxidation-model"  # 替换为您的锂体系氧化电位模型路径
+        model_path = "./ag-li-oxidation-model"
     else:
-        model_path = "./ag-li-reduction-model"  # 替换为您的锂体系还原电位模型路径
+        model_path = "./ag-li-reduction-model"
 else:
     system_name = "Na-ion Solid Electrolytes"
     example_formula = "e.g., Na5Zr2F13, Na6ZnS4, Na2ZnO2"
     if prediction_target == "Oxidation Potential":
-        model_path = "./ag-na-oxidation-model"  # 替换为您的钠体系氧化电位模型路径
+        model_path = "./ag-na-oxidation-model"
     else:
-        model_path = "./ag-na-reduction-model"  # 替换为您的钠体系还原电位模型路径
+        model_path = "./ag-na-reduction-model"
 
 # 页面标题和简介
 st.markdown(
@@ -103,13 +103,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# FORMULA 输入区域（根据数据集自动匹配示例）
+# FORMULA 输入区域
 formula_input = st.text_input("Enter Chemical Formula of the Material:", placeholder=example_formula)
 
 # 提交按钮
 submit_button = st.button("Submit and Predict", key="predict_button")
 
-# 特征列表（请确保与您训练模型时使用的特征一致）
+# 特征列表
 required_descriptors = [
     'MagpieData mean CovalentRadius',
     'MagpieData avg_dev SpaceGroupNumber',
@@ -122,13 +122,11 @@ required_descriptors = [
 # 缓存模型加载器
 @st.cache_resource(show_spinner=False, max_entries=4)
 def load_predictor(path):
-    """缓存模型加载，避免重复加载导致内存溢出"""
     return TabularPredictor.load(path)
 
 
 # 材料特征计算函数
 def calculate_material_features(formula):
-    """计算材料的组成特征"""
     try:
         from matminer.featurizers.composition import (
             ElementProperty, Meredig, Stoichiometry, IonProperty
@@ -173,7 +171,6 @@ def calculate_material_features(formula):
 
 
 def filter_selected_features(features_dict, selected_descriptors):
-    """只显示选定的特征"""
     filtered_features = {}
     for feature_name in selected_descriptors:
         if feature_name in features_dict:
@@ -214,7 +211,6 @@ if submit_button:
                     input_df = pd.DataFrame(input_data)
                 
                 try:
-                    # 动态加载当前选择的模型路径
                     predictor = load_predictor(model_path)
                     
                     essential_models = ['CatBoost',
