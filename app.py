@@ -15,7 +15,7 @@ from tqdm import tqdm
 import numpy as np
 
 
-# 添加 CSS 样式（已修复负边距导致的遮挡问题）
+# 添加 CSS 样式
 st.markdown(
     """
     <style>
@@ -60,7 +60,21 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 选择体系与预测目标
+# 1. 先在顶部展示页面标题和简介
+st.markdown(
+    """
+    <div class='rounded-container'>
+        <h2 style="font-size:22px;">Solid Electrolyte Electrochemical Properties Prediction</h2>
+        <blockquote>
+            1. This web app predicts the electrochemical properties of solid electrolytes based on composition features.<br>
+            2. Select the electrolyte system and target property below, then enter a valid chemical formula.
+        </blockquote>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# 2. 将“选择体系”和“预测目标”放在标题下方、输入框上方
 col1, col2 = st.columns(2)
 with col1:
     electrolyte_system = st.selectbox(
@@ -89,24 +103,10 @@ else:
     else:
         model_path = "./ag-na-reduction-model"
 
-# 页面标题和简介
-st.markdown(
-    f"""
-    <div class='rounded-container'>
-        <h2 style="font-size:22px;">Predict {prediction_target} for {system_name}</h2>
-        <blockquote>
-            1. This web app predicts the {prediction_target.lower()} of {system_name.lower()} based on composition features.<br>
-            2. Enter a valid chemical formula string below to get the predicted result.
-        </blockquote>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# FORMULA 输入区域
+# 3. FORMULA 输入区域
 formula_input = st.text_input("Enter Chemical Formula of the Material:", placeholder=example_formula)
 
-# 提交按钮
+# 4. 提交按钮
 submit_button = st.button("Submit and Predict", key="predict_button")
 
 # 特征列表
