@@ -1,12 +1,21 @@
+# Fix Streamlit dependency conflict
+rich==13.7.1
+
 streamlit==1.30.0
 rdkit==2024.9.6
 numpy==1.26.4
 pandas==2.1.4
 autogluon==1.2.0
-pillow==10.4.0  # 显式指定兼容版本
+pillow==10.4.0
 
 pymatgen==2023.9.10
 matminer==0.9.3
 
 mordred
-#git+https://github.com/mordred-descriptor/mordred.git
+py3Dmol
+
+# Utilities
+requests
+plotly
+
+setuptools==69.5.1
