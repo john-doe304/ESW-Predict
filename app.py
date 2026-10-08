@@ -15,7 +15,7 @@ from tqdm import tqdm
 import numpy as np
 
 
-# 添加 CSS 样式（还原第一张图的完美卡片边距与阴影效果）
+# 添加 CSS 样式
 st.markdown(
     """
     <style>
@@ -43,19 +43,15 @@ st.markdown(
         font-size: 1.1em;
         border-radius: 10px;
     }
-    /* 减小指标卡片的字体大小 */
     .stMetric {
         font-size: 0.9em;
     }
-    /* 减小特征提取成功信息的字体大小 */
     .stWrite {
         font-size: 0.9em;
     }
-    /* 减小子标题的字体大小 */
     h3 {
         font-size: 1.2em;
     }
-    /* 减小数据框的字体大小 */
     .dataframe {
         font-size: 0.8em;
     }
@@ -64,53 +60,53 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 1. 恢复第一张图的精美标题和说明样式
+# 页面标题和简介
 st.markdown(
     """
     <div class='rounded-container'>
         <h2 style="font-size:22px;">Electrochemical Properties Prediction</h2>
         <blockquote>
-            1. This web app predicts the electrochemical properties of solid electrolytes based on material composition features.<br>
-            2. Select the system and target below, then enter a valid chemical formula string.
+            1. This web app predicts electrochemical potentials of solid-state electrolytes.<br>
+            2. Select the electrolyte system and target below, then enter a valid chemical formula string.
         </blockquote>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-# 2. 将“选择体系”和“预测目标”放置在输入化学式上方（左右两列布局）
+# 选择体系与预测目标（已将选项名称改为与表格一致的规范术语）
 col1, col2 = st.columns(2)
 with col1:
     electrolyte_system = st.selectbox(
         "Select Electrolyte System:",
-        ("Lithium (Li-ion)", "Sodium (Na-ion)")
+        ("Li-containing compounds", "Na-containing compounds")
     )
 with col2:
     prediction_target = st.selectbox(
         "Select Prediction Target:",
-        ("Oxidation Potential", "Reduction Potential")
+        ("Oxidation potential", "Reduction potential")
     )
 
 # 根据选择动态调整提示文本、示例与模型路径
-if electrolyte_system == "Lithium (Li-ion)":
-    system_name = "Li-ion Solid Electrolytes"
+if electrolyte_system == "Li-containing compounds":
+    system_name = "Li-containing compounds"
     example_formula = "e.g., Ba2Li3(PO3)7, Li7La3Zr2O12, Li10GeP2S12"
-    if prediction_target == "Oxidation Potential":
+    if prediction_target == "Oxidation potential":
         model_path = "./ag-li-oxidation-model"
     else:
         model_path = "./ag-li-reduction-model"
 else:
-    system_name = "Na-ion Solid Electrolytes"
+    system_name = "Na-containing compounds"
     example_formula = "e.g., Na5Zr2F13, Na6ZnS4, Na2ZnO2"
-    if prediction_target == "Oxidation Potential":
+    if prediction_target == "Oxidation potential":
         model_path = "./ag-na-oxidation-model"
     else:
         model_path = "./ag-na-reduction-model"
 
-# 3. FORMULA 输入区域
+# FORMULA 输入区域
 formula_input = st.text_input("Enter Chemical Formula of the Material:", placeholder=example_formula)
 
-# 4. 提交按钮
+# 提交按钮
 submit_button = st.button("Submit and Predict", key="predict_button")
 
 # 指定的描述符列表
@@ -127,13 +123,11 @@ required_descriptors = [
 # 缓存模型加载器
 @st.cache_resource(show_spinner=False, max_entries=4)
 def load_predictor(path):
-    """缓存模型加载，避免重复加载导致内存溢出"""
     return TabularPredictor.load(path)
 
 
 # 材料特征计算函数
 def calculate_material_features(formula):
-    """计算材料的组成特征"""
     try:
         from matminer.featurizers.composition import (
             ElementProperty, Meredig, Stoichiometry, IonProperty
@@ -178,11 +172,10 @@ def calculate_material_features(formula):
 
 
 def filter_selected_features(features_dict, selected_descriptors):
-    """只选定的特征"""
     filtered_features = {}
     for feature_name in selected_descriptors:
         if feature_name == 'Temp':
-            filtered_features[feature_name] = 298.0  # 默认温度
+            filtered_features[feature_name] = 298.0
             continue
         if feature_name in features_dict:
             filtered_features[feature_name] = features_dict[feature_name]
