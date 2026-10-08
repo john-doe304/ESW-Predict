@@ -15,21 +15,21 @@ from tqdm import tqdm
 import numpy as np
 
 
-# 添加 CSS 样式
+# 添加 CSS 样式（还原第一张图的完美卡片边距与阴影效果）
 st.markdown(
     """
     <style>
     .stApp {
         border: 2px solid #808080;
         border-radius: 20px;
-        margin: 30px auto;
-        max-width: 45%;
+        margin: 50px auto;
+        max-width: 40%;
         background-color: #f9f9f9f9;
         padding: 20px;
         box-sizing: border-box;
     }
     .rounded-container h2 {
-        margin-top: 10px;
+        margin-top: -80px;
         text-align: center;
         background-color: #e0e0e0e0;
         padding: 10px;
@@ -37,21 +37,25 @@ st.markdown(
     }
     .rounded-container blockquote {
         text-align: left;
-        margin: 15px auto;
+        margin: 20px auto;
         background-color: #f0f0f0;
         padding: 10px;
-        font-size: 1.05em;
+        font-size: 1.1em;
         border-radius: 10px;
     }
+    /* 减小指标卡片的字体大小 */
     .stMetric {
         font-size: 0.9em;
     }
+    /* 减小特征提取成功信息的字体大小 */
     .stWrite {
         font-size: 0.9em;
     }
+    /* 减小子标题的字体大小 */
     h3 {
         font-size: 1.2em;
     }
+    /* 减小数据框的字体大小 */
     .dataframe {
         font-size: 0.8em;
     }
@@ -60,21 +64,21 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 1. 先在顶部展示页面标题和简介
+# 1. 恢复第一张图的精美标题和说明样式
 st.markdown(
     """
     <div class='rounded-container'>
-        <h2 style="font-size:22px;">Solid Electrolyte Electrochemical Properties Prediction</h2>
+        <h2 style="font-size:22px;">Electrochemical Properties Prediction</h2>
         <blockquote>
-            1. This web app predicts the electrochemical properties of solid electrolytes based on composition features.<br>
-            2. Select the electrolyte system and target property below, then enter a valid chemical formula.
+            1. This web app predicts the electrochemical properties of solid electrolytes based on material composition features.<br>
+            2. Select the system and target below, then enter a valid chemical formula string.
         </blockquote>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-# 2. 将“选择体系”和“预测目标”放在标题下方、输入框上方
+# 2. 将“选择体系”和“预测目标”放置在输入化学式上方（左右两列布局）
 col1, col2 = st.columns(2)
 with col1:
     electrolyte_system = st.selectbox(
@@ -109,9 +113,10 @@ formula_input = st.text_input("Enter Chemical Formula of the Material:", placeho
 # 4. 提交按钮
 submit_button = st.button("Submit and Predict", key="predict_button")
 
-# 特征列表
+# 指定的描述符列表
 required_descriptors = [
     'MagpieData mean CovalentRadius',
+    'Temp',
     'MagpieData avg_dev SpaceGroupNumber',
     '0-norm',
     'MagpieData mean MeltingT',
@@ -122,11 +127,13 @@ required_descriptors = [
 # 缓存模型加载器
 @st.cache_resource(show_spinner=False, max_entries=4)
 def load_predictor(path):
+    """缓存模型加载，避免重复加载导致内存溢出"""
     return TabularPredictor.load(path)
 
 
 # 材料特征计算函数
 def calculate_material_features(formula):
+    """计算材料的组成特征"""
     try:
         from matminer.featurizers.composition import (
             ElementProperty, Meredig, Stoichiometry, IonProperty
@@ -171,8 +178,12 @@ def calculate_material_features(formula):
 
 
 def filter_selected_features(features_dict, selected_descriptors):
+    """只选定的特征"""
     filtered_features = {}
     for feature_name in selected_descriptors:
+        if feature_name == 'Temp':
+            filtered_features[feature_name] = 298.0  # 默认温度
+            continue
         if feature_name in features_dict:
             filtered_features[feature_name] = features_dict[feature_name]
         else:
@@ -198,11 +209,14 @@ if submit_button:
                 if features:
                     input_data = {
                         "Formula": [formula_input],
+                        "Temp": [298.0],
                     }
                     
                     numeric_features = {}
                     for feature_name in required_descriptors:
-                        if feature_name in features:
+                        if feature_name == 'Temp':
+                            numeric_features[feature_name] = [298.0]
+                        elif feature_name in features:
                             numeric_features[feature_name] = [features[feature_name]]
                         else:
                             numeric_features[feature_name] = [0.0]
