@@ -23,7 +23,7 @@ st.markdown(
         border: 2px solid #808080;
         border-radius: 20px;
         margin: 50px auto;
-        max-width: 40%;
+        max-width: 42%;
         background-color: #f9f9f9f9;
         padding: 20px;
         box-sizing: border-box;
@@ -60,28 +60,42 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 【新增】选择预测目标：氧化电位 还是 还原电位
-prediction_target = st.selectbox(
-    "Select Prediction Target:",
-    ("Oxidation Potential", "Reduction Potential")
-)
+# 侧边栏或主页面选择：体系与预测目标
+col1, col2 = st.columns(2)
+with col1:
+    electrolyte_system = st.selectbox(
+        "Select Electrolyte System:",
+        ("Lithium (Li-ion)", "Sodium (Na-ion)")
+    )
+with col2:
+    prediction_target = st.selectbox(
+        "Select Prediction Target:",
+        ("Oxidation Potential", "Reduction Potential")
+    )
 
-# 根据选择动态改变标题和简介
-if prediction_target == "Oxidation Potential":
-    app_title = "Predict Oxidation Potential of Solid Electrolytes"
-    app_desc = "This web app predicts oxidation potential of solid electrolytes based on material composition features."
-    model_path = "./ag-oxidation-potential-model"  # 对应您的氧化电位模型文件夹
+# 根据选择动态调整提示文本、示例与模型路径
+if electrolyte_system == "Lithium (Li-ion)":
+    system_name = "Li-ion Solid Electrolytes"
+    example_formula = "e.g., Ba2Li3(PO3)7, Li7La3Zr2O12, Li10GeP2S12"
+    if prediction_target == "Oxidation Potential":
+        model_path = "./ag-li-oxidation-model"  # 替换为您的锂体系氧化电位模型路径
+    else:
+        model_path = "./ag-li-reduction-model"  # 替换为您的锂体系还原电位模型路径
 else:
-    app_title = "Predict Reduction Potential of Solid Electrolytes"
-    app_desc = "This web app predicts reduction potential of solid electrolytes based on material composition features."
-    model_path = "./ag-reduction-potential-model"  # 对应您的还原电位模型文件夹
+    system_name = "Na-ion Solid Electrolytes"
+    example_formula = "e.g., Na5Zr2F13, Na6ZnS4, Na2ZnO2"
+    if prediction_target == "Oxidation Potential":
+        model_path = "./ag-na-oxidation-model"  # 替换为您的钠体系氧化电位模型路径
+    else:
+        model_path = "./ag-na-reduction-model"  # 替换为您的钠体系还原电位模型路径
 
+# 页面标题和简介
 st.markdown(
     f"""
     <div class='rounded-container'>
-        <h2 style="font-size:24px;">{app_title}</h2>
+        <h2 style="font-size:22px;">Predict {prediction_target} for {system_name}</h2>
         <blockquote>
-            1. {app_desc}<br>
+            1. This web app predicts the {prediction_target.lower()} of {system_name.lower()} based on composition features.<br>
             2. Enter a valid chemical formula string below to get the predicted result.
         </blockquote>
     </div>
@@ -89,13 +103,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# FORMULA 输入区域
-formula_input = st.text_input("Enter Chemical Formula of the Material:", placeholder="e.g., Li7La3Zr2O12, Li10GeP2S12, Li3YCl6")
+# FORMULA 输入区域（根据数据集自动匹配示例）
+formula_input = st.text_input("Enter Chemical Formula of the Material:", placeholder=example_formula)
 
 # 提交按钮
 submit_button = st.button("Submit and Predict", key="predict_button")
 
-# 特征列表（请根据您实际训练模型时所用的特征进行调整）
+# 特征列表（请确保与您训练模型时使用的特征一致）
 required_descriptors = [
     'MagpieData mean CovalentRadius',
     'MagpieData avg_dev SpaceGroupNumber',
@@ -105,8 +119,8 @@ required_descriptors = [
     'MagpieData mean NValence'
 ]
 
-# 动态加载对应模型的加载器
-@st.cache_resource(show_spinner=False, max_entries=2)
+# 缓存模型加载器
+@st.cache_resource(show_spinner=False, max_entries=4)
 def load_predictor(path):
     """缓存模型加载，避免重复加载导致内存溢出"""
     return TabularPredictor.load(path)
@@ -200,7 +214,7 @@ if submit_button:
                     input_df = pd.DataFrame(input_data)
                 
                 try:
-                    # 动态加载当前选择的模型
+                    # 动态加载当前选择的模型路径
                     predictor = load_predictor(model_path)
                     
                     essential_models = ['CatBoost',
@@ -220,7 +234,7 @@ if submit_button:
                         except Exception as model_error:
                             predictions_dict[model] = "Error"
 
-                    st.write(f"Prediction Results for {prediction_target} (Essential Models):")
+                    st.write(f"Prediction Results for {electrolyte_system} - {prediction_target}:")
                     st.markdown(
                         "**Note:** WeightedEnsemble_L2 is a meta-model combining predictions from other models.")
                     results_df = pd.DataFrame(predictions_dict)
@@ -230,7 +244,7 @@ if submit_button:
                     gc.collect()
 
                 except Exception as e:
-                    st.error(f"Model loading failed (Please check if '{model_path}' exists in the repository): {str(e)}")
+                    st.error(f"Model loading failed (Please check if folder '{model_path}' exists in GitHub): {str(e)}")
 
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
