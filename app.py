@@ -60,13 +60,28 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 【修改点 1】修改页面标题和简介（例如改为氧化电位或还原电位）
+# 【新增】选择预测目标：氧化电位 还是 还原电位
+prediction_target = st.selectbox(
+    "Select Prediction Target:",
+    ("Oxidation Potential", "Reduction Potential")
+)
+
+# 根据选择动态改变标题和简介
+if prediction_target == "Oxidation Potential":
+    app_title = "Predict Oxidation Potential of Solid Electrolytes"
+    app_desc = "This web app predicts oxidation potential of solid electrolytes based on material composition features."
+    model_path = "./ag-oxidation-potential-model"  # 对应您的氧化电位模型文件夹
+else:
+    app_title = "Predict Reduction Potential of Solid Electrolytes"
+    app_desc = "This web app predicts reduction potential of solid electrolytes based on material composition features."
+    model_path = "./ag-reduction-potential-model"  # 对应您的还原电位模型文件夹
+
 st.markdown(
-    """
+    f"""
     <div class='rounded-container'>
-        <h2 style="font-size:24px;"> Predict Oxidation Potential of Solid Electrolytes</h2>
+        <h2 style="font-size:24px;">{app_title}</h2>
         <blockquote>
-            1. This web app predicts oxidation potential of solid electrolytes based on material composition features.<br>
+            1. {app_desc}<br>
             2. Enter a valid chemical formula string below to get the predicted result.
         </blockquote>
     </div>
@@ -77,13 +92,10 @@ st.markdown(
 # FORMULA 输入区域
 formula_input = st.text_input("Enter Chemical Formula of the Material:", placeholder="e.g., Li7La3Zr2O12, Li10GeP2S12, Li3YCl6")
 
-# 如果您的模型不需要温度（Temp），可以把下面这行温度输入删掉或注释掉
-# temperature = st.number_input("Select Temperature (K):", min_value=200, max_value=1000, value=298, step=10)
-
 # 提交按钮
 submit_button = st.button("Submit and Predict", key="predict_button")
 
-# 【修改点 2】根据您的氧化/还原电位模型实际训练时所用的特征名称，修改这里的特征列表
+# 特征列表（请根据您实际训练模型时所用的特征进行调整）
 required_descriptors = [
     'MagpieData mean CovalentRadius',
     'MagpieData avg_dev SpaceGroupNumber',
@@ -93,11 +105,11 @@ required_descriptors = [
     'MagpieData mean NValence'
 ]
 
-# 【修改点 3】修改为您训练好的氧化/还原电位 AutoGluon 模型文件夹路径
-@st.cache_resource(show_spinner=False, max_entries=1)
-def load_predictor():
+# 动态加载对应模型的加载器
+@st.cache_resource(show_spinner=False, max_entries=2)
+def load_predictor(path):
     """缓存模型加载，避免重复加载导致内存溢出"""
-    return TabularPredictor.load("./ag-oxidation-potential-model")  # 替换为您的实际模型文件夹名称
+    return TabularPredictor.load(path)
 
 
 # 材料特征计算函数
@@ -188,7 +200,8 @@ if submit_button:
                     input_df = pd.DataFrame(input_data)
                 
                 try:
-                    predictor = load_predictor()
+                    # 动态加载当前选择的模型
+                    predictor = load_predictor(model_path)
                     
                     essential_models = ['CatBoost',
                                         'ExtraTreesMSE',
@@ -207,7 +220,7 @@ if submit_button:
                         except Exception as model_error:
                             predictions_dict[model] = "Error"
 
-                    st.write("Prediction Results (Essential Models):")
+                    st.write(f"Prediction Results for {prediction_target} (Essential Models):")
                     st.markdown(
                         "**Note:** WeightedEnsemble_L2 is a meta-model combining predictions from other models.")
                     results_df = pd.DataFrame(predictions_dict)
@@ -217,7 +230,7 @@ if submit_button:
                     gc.collect()
 
                 except Exception as e:
-                    st.error(f"Model loading failed: {str(e)}")
+                    st.error(f"Model loading failed (Please check if '{model_path}' exists in the repository): {str(e)}")
 
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
