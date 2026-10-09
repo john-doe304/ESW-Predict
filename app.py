@@ -1,6 +1,6 @@
 # -----------------------------------------------------------
-#   Electrochemical Properties Predictor (Clean Version)
-#   With MP Crystal 3D Rendering & Direct Prediction Output
+#   Electrochemical Properties Predictor (Final Styled & Fixed)
+#   With MP Crystal Supercell Rendering & Clean Layout
 # -----------------------------------------------------------
 
 import streamlit as st
@@ -74,33 +74,40 @@ MP_COLORS = {
     "Th": "#00BAFF", "Pa": "#00A1FF", "U": "#008FFF", "Np": "#0080FF", "Pu": "#006BFF"
 }
 
-# 添加 CSS 样式
+# 添加 CSS 样式（精准修复顶部标题悬浮框与主卡片外框）
 st.markdown(
     """
     <style>
     .stApp {
         border: 2px solid #808080;
         border-radius: 20px;
-        margin: 30px auto;
+        margin: 40px auto;
         max-width: 45%;
         background-color: #f9f9f9f9;
-        padding: 20px;
+        padding: 25px;
         box-sizing: border-box;
     }
+    .rounded-container {
+        margin-top: 20px;
+        margin-bottom: 25px;
+    }
     .rounded-container h2 {
-        margin-top: -80px;
+        margin-top: -45px;
         text-align: center;
         background-color: #e0e0e0e0;
-        padding: 10px;
+        padding: 12px;
         border-radius: 10px;
+        font-size: 22px;
+        color: #333;
     }
     .rounded-container blockquote {
         text-align: left;
         margin: 15px auto;
         background-color: #f0f0f0;
-        padding: 10px;
-        font-size: 1.05em;
+        padding: 12px;
+        font-size: 1.0em;
         border-radius: 10px;
+        border-left: 5px solid #808080;
     }
     .stMetric {
         font-size: 0.9em;
@@ -123,13 +130,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 页面标题和简介
+# 页面标题和简介（带有完美的悬浮卡片样式）
 st.markdown(
     """
     <div class='rounded-container'>
         <h2 style="font-size:22px;">Electrochemical Properties Prediction</h2>
         <blockquote>
-            1. This web app predicts electrochemical potentials of solid-state electrolytes[cite: 13].<br>
+            1. This web app predicts electrochemical potentials of solid-state electrolytes.<br>
             2. Select the electrolyte system and target below, then enter a valid chemical formula string.
         </blockquote>
     </div>
@@ -150,7 +157,7 @@ with col_tar:
         ("Oxidation potential", "Reduction potential")
     )
 
-# 根据选择动态调整模型路径、示例化学式与特征描述符
+# 根据选择动态调整模型路径与示例化学式
 if electrolyte_system == "Li-containing compounds":
     system_name = "Li-containing compounds"
     example_formula = "e.g., Ba2Li3(PO3)7, Li7La3Zr2O12, Li10GeP2S12"
@@ -211,7 +218,7 @@ def load_predictor(path):
     return TabularPredictor.load(path, require_py_version_match=False)
 
 
-# ------------------------------- MP 结构加载 -------------------------------
+# ------------------------------- MP 结构加载（含智能超胞扩充） -------------------------------
 def load_structure_from_mp(formula, api_key):
     if MPRester is None:
         return None, "mp-api not installed"
@@ -221,10 +228,13 @@ def load_structure_from_mp(formula, api_key):
             if not results:
                 return None, "No MP entry found"
             doc = results[0]
-            try:
-                struct = doc.structure.get_primitive_structure()
-            except Exception:
-                struct = doc.structure
+            struct = doc.structure
+            # 智能判断：如果原子数较少，自动扩展为 2x2x2 超胞，让 3D 渲染饱满清晰
+            if len(struct) < 25:
+                try:
+                    struct.make_supercell([2, 2, 2])
+                except Exception:
+                    pass
             return struct, "Successfully loaded from MP"
     except Exception as e:
         return None, f"MP error: {e}"
@@ -357,9 +367,8 @@ if submit_button:
         st.stop()
 
     with st.spinner("Processing crystal structure and predicting..."):
-        # 1. 结构加载与 3D 渲染
+        # 1. 结构加载与 3D 渲染（已加入智能超胞）
         structure = None
-        mp_msg = ""
         if (mp_key_input and not use_placeholder_checkbox) and (MPRester is not None):
             try:
                 struct, info = load_structure_from_mp(formula_input, mp_key_input)
@@ -377,7 +386,7 @@ if submit_button:
             if html:
                 components.html(html, height=260, scrolling=False)
 
-        # 2. 特征提取与模型预测（后台自动完成，不再前端展示表格）
+        # 2. 特征提取与模型预测
         features = calculate_material_features(formula_input)
 
         input_data = {"Formula": [formula_input], "Temp": [298.0]}
