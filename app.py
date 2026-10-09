@@ -74,7 +74,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 选择体系与预测目标（已将选项名称改为与表格一致的规范术语）
+# 选择体系与预测目标
 col1, col2 = st.columns(2)
 with col1:
     electrolyte_system = st.selectbox(
@@ -87,7 +87,7 @@ with col2:
         ("Oxidation potential", "Reduction potential")
     )
 
-# 根据选择动态调整提示文本、示例与模型路径
+# 根据选择动态调整模型路径与示例化学式
 if electrolyte_system == "Li-containing compounds":
     system_name = "Li-containing compounds"
     example_formula = "e.g., Ba2Li3(PO3)7, Li7La3Zr2O12, Li10GeP2S12"
@@ -103,46 +103,35 @@ else:
     else:
         model_path = "./ag-20260901_120826"
 
-# FORMULA 输入区域
-formula_input = st.text_input("Enter Chemical Formula of the Material:", placeholder=example_formula)
-
-# 提交按钮
-submit_button = st.button("Submit and Predict", key="predict_button")
-
-# 根据不同的体系和电位类型，定义各自的特征描述符列表
-# （请将下面对应的特征名称替换为您实际训练该模型时所用的特征）
+# 各模型对应的特征描述符列表
 descriptors_dict = {
     "Li-containing compounds": {
         "Oxidation potential": [
-            'mean Electronegativity	',
+            'mean Electronegativity',
             'MagpieData mode Column',
             'MagpieData avg_dev GSbandgap',
             'MagpieData mode SpaceGroupNumber',
-            'MagpieData avg_dev SpaceGroupNumber',
-            
+            'MagpieData avg_dev SpaceGroupNumber'
         ],
         "Reduction potential": [
-            # TODO: 请在此处填入【含Li时预测还原电位】的特征列表
             'mean Electronegativity',
             'MagpieData range NdValence',
             'MagpieData avg_dev GSbandgap',
-            'MagpieData avg_dev SpaceGroupNumber'
+            'MagpieData avg_dev SpaceGroupNumber',
             'MagpieData avg_dev NpValence',
             'MagpieData avg_dev NUnfilled',
             'MagpieData mean NpUnfilled',
-            'MagpieData mean GSvolume_pa',
+            'MagpieData mean GSvolume_pa'
         ]
     },
     "Na-containing compounds": {
         "Oxidation potential": [
-            # TODO: 请在此处填入【含Na时预测氧化电位】的特征列表
             'avg p valence electrons',
-            'vpa_cif	',
+            'vpa_cif',
             'minimum Row',
-            'range NpValence',
+            'range NpValence'
         ],
         "Reduction potential": [
-            # TODO: 请在此处填入【含Na时预测还原电位】的特征列表
             'avg p valence electrons',
             'avg d valence electrons',
             'mean NValence',
@@ -154,22 +143,27 @@ descriptors_dict = {
     }
 }
 
-# 当前选中的描述符列表会自动根据用户选择进行切换
 required_descriptors = descriptors_dict[electrolyte_system][prediction_target]
 
-# 缓存模型加载器
+# FORMULA 输入区域
+formula_input = st.text_input("Enter Chemical Formula of the Material:", placeholder=example_formula)
+
+# 提交按钮
+submit_button = st.button("Submit and Predict", key="predict_button")
+
+# 缓存模型加载器（加入 require_py_version_match=False 解决 Python 版本不匹配报错）
 @st.cache_resource(show_spinner=False, max_entries=4)
 def load_predictor(path):
-    return TabularPredictor.load(path)
+    return TabularPredictor.load(path, require_py_version_match=False)
 
 
-# 材料特征计算函数
+# 材料特征计算函数（兼容组分特征与缺失的3D结构特征补零）
 def calculate_material_features(formula):
     try:
         from matminer.featurizers.composition import (
-            ElementProperty, Meredig, Stoichiometry, IonProperty
+            ElementProperty, Meredig, Stoichiometry
         )
-        from matminer.featurizers.conversions import StrToComposition, CompositionToOxidComposition
+        from matminer.featurizers.conversions import StrToComposition
 
         df = pd.DataFrame({'Formula': [formula]})
         stc = StrToComposition()
@@ -180,6 +174,7 @@ def calculate_material_features(formula):
 
         features = {'Formula': formula}
 
+        # 提取 Magpie、Meredig、Stoichiometry 组分特征
         ep = ElementProperty.from_preset('magpie')
         df = ep.featurize_dataframe(df, 'composition', ignore_errors=True)
 
@@ -188,11 +183,6 @@ def calculate_material_features(formula):
 
         sto = Stoichiometry()
         df = sto.featurize_dataframe(df, 'composition', ignore_errors=True)
-
-        cto = CompositionToOxidComposition()
-        df = cto.featurize_dataframe(df, 'composition_oxid', ignore_errors=True)
-        ion = IonProperty()
-        df = ion.featurize_dataframe(df, 'composition_oxid', ignore_errors=True)
 
         numeric_columns = df.select_dtypes(include=[np.number]).columns
         for col in numeric_columns:
@@ -214,6 +204,7 @@ def filter_selected_features(features_dict, selected_descriptors):
         if feature_name == 'Temp':
             filtered_features[feature_name] = 298.0
             continue
+        # 如果模型特征中包含结构特征（如 vpa_cif 等），在仅输入化学式时自动补 0.0 容错
         if feature_name in features_dict:
             filtered_features[feature_name] = features_dict[feature_name]
         else:
@@ -249,7 +240,7 @@ if submit_button:
                         elif feature_name in features:
                             numeric_features[feature_name] = [features[feature_name]]
                         else:
-                            numeric_features[feature_name] = [0.0]
+                            numeric_features[feature_name] = [0.0]  # 对未提取到的结构特征默认补零
                         
                     input_data.update(numeric_features)
                     input_df = pd.DataFrame(input_data)
@@ -284,7 +275,7 @@ if submit_button:
                     gc.collect()
 
                 except Exception as e:
-                    st.error(f"Model loading failed (Please check if folder '{model_path}' exists in GitHub): {str(e)}")
+                    st.error(f"Model loading failed! Please ensure the folder **'{model_path}'** exists in GitHub. Details: {str(e)}")
 
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
