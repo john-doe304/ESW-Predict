@@ -115,37 +115,41 @@ descriptors_dict = {
     "Li-containing compounds": {
         "Oxidation potential": [
             'mean Electronegativity	',
-            'mode Column',
+            'MagpieData mode Column',
             'MagpieData avg_dev GSbandgap',
-            '0-norm',
-            'MagpieData mean MeltingT',
-            'MagpieData avg_dev Column',
-            'MagpieData mean NValence'
+            'MagpieData mode SpaceGroupNumber',
+            'MagpieData avg_dev SpaceGroupNumber',
+            
         ],
         "Reduction potential": [
             # TODO: 请在此处填入【含Li时预测还原电位】的特征列表
-            'MagpieData mean CovalentRadius',
-            'Temp',
-            'MagpieData mean AtomicWeight',
-            '0-norm',
-            'MagpieData mean MeltingT'
+            'mean Electronegativity',
+            'MagpieData range NdValence',
+            'MagpieData avg_dev GSbandgap',
+            'MagpieData avg_dev SpaceGroupNumber'
+            'MagpieData avg_dev NpValence',
+            'MagpieData avg_dev NUnfilled',
+            'MagpieData mean NpUnfilled',
+            'MagpieData mean GSvolume_pa',
         ]
     },
     "Na-containing compounds": {
         "Oxidation potential": [
             # TODO: 请在此处填入【含Na时预测氧化电位】的特征列表
-            'MagpieData mean CovalentRadius',
-            'Temp',
-            'MagpieData avg_dev SpaceGroupNumber',
-            '0-norm',
-            'MagpieData mean MeltingT'
+            'avg p valence electrons',
+            'vpa_cif	',
+            'minimum Row',
+            'range NpValence',
         ],
         "Reduction potential": [
             # TODO: 请在此处填入【含Na时预测还原电位】的特征列表
-            'MagpieData mean CovalentRadius',
-            'Temp',
-            'MagpieData mean AtomicWeight',
-            '0-norm'
+            'avg p valence electrons',
+            'avg d valence electrons',
+            'mean NValence',
+            'range NUnfilled',
+            'range NValence',
+            'avg_dev CovalentRadius',
+            'avg_dev GSvolume_pa'
         ]
     }
 }
