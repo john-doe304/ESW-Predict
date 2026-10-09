@@ -92,16 +92,16 @@ if electrolyte_system == "Li-containing compounds":
     system_name = "Li-containing compounds"
     example_formula = "e.g., Ba2Li3(PO3)7, Li7La3Zr2O12, Li10GeP2S12"
     if prediction_target == "Oxidation potential":
-        model_path = "./ag-li-oxidation-model"
+        model_path = "./ag_20260729_025205"
     else:
-        model_path = "./ag-li-reduction-model"
+        model_path = "./ag-20260729_071442"
 else:
     system_name = "Na-containing compounds"
     example_formula = "e.g., Na5Zr2F13, Na6ZnS4, Na2ZnO2"
     if prediction_target == "Oxidation potential":
-        model_path = "./ag-na-oxidation-model"
+        model_path = "./ag-20260901_120910"
     else:
-        model_path = "./ag-na-reduction-model"
+        model_path = "./ag-20260901_120826"
 
 # FORMULA 输入区域
 formula_input = st.text_input("Enter Chemical Formula of the Material:", placeholder=example_formula)
