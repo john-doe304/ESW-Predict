@@ -74,51 +74,52 @@ MP_COLORS = {
     "Th": "#00BAFF", "Pa": "#00A1FF", "U": "#008FFF", "Np": "#0080FF", "Pu": "#006BFF"
 }
 
-# 添加 CSS 样式 (同步完美外框布局，修复顶部线切断问题)
+# 添加 CSS 样式
 st.markdown(
     """
     <style>
     .stApp {
         border: 2px solid #808080;
         border-radius: 20px;
-        margin: 40px auto;
+        margin: 50px auto;
         max-width: 40%;
         background-color: #f9f9f9f9;
-        padding: 25px;
+        padding: 20px;
         box-sizing: border-box;
     }
-    .rounded-container {
-        margin-top: 10px;
-        margin-bottom: 25px;
-    }
     .rounded-container h2 {
-        margin-top: 0px; 
+        margin-top: -80px;
         text-align: center;
         background-color: #e0e0e0e0;
-        padding: 12px;
+        padding: 10px;
         border-radius: 10px;
     }
     .rounded-container blockquote {
         text-align: left;
         margin: 20px auto;
         background-color: #f0f0f0;
-        padding: 12px;
+        padding: 10px;
         font-size: 1.1em;
         border-radius: 10px;
     }
+    /* 减小指标卡片的字体大小 */
     .stMetric {
         font-size: 0.9em;
     }
+    /* 减小特征提取成功信息的字体大小 */
     .stWrite {
         font-size: 0.9em;
     }
+    /* 减小子标题的字体大小 */
     h3 {
         font-size: 1.2em;
         margin-bottom: 0.5em;
     }
+    /* 减小数据框的字体大小 */
     .dataframe {
         font-size: 0.8em;
     }
+    /* 调整结构和图例列之间的间距 */
     div[data-testid="column"] {
         padding: 0px !important;
     }
