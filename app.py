@@ -1,5 +1,5 @@
 # -----------------------------------------------------------
-#   Electrochemical Properties Predictor (Final Styled & Fixed)
+#   Electrochemical Properties Predictor (Fixed Top Border)
 #   With MP Crystal Supercell Rendering & Clean Layout
 # -----------------------------------------------------------
 
@@ -74,7 +74,7 @@ MP_COLORS = {
     "Th": "#00BAFF", "Pa": "#00A1FF", "U": "#008FFF", "Np": "#0080FF", "Pu": "#006BFF"
 }
 
-# 添加 CSS 样式（精准修复顶部标题悬浮框与主卡片外框）
+# 添加 CSS 样式（已修复顶部边框缺失问题）
 st.markdown(
     """
     <style>
@@ -88,11 +88,11 @@ st.markdown(
         box-sizing: border-box;
     }
     .rounded-container {
-        margin-top: 20px;
+        margin-top: 10px;
         margin-bottom: 25px;
     }
     .rounded-container h2 {
-        margin-top: -45px;
+        margin-top: 0px; /* 移除负边距，保证顶部边框线完整显示 */
         text-align: center;
         background-color: #e0e0e0e0;
         padding: 12px;
@@ -130,7 +130,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 页面标题和简介（带有完美的悬浮卡片样式）
+# 页面标题和简介
 st.markdown(
     """
     <div class='rounded-container'>
@@ -229,7 +229,6 @@ def load_structure_from_mp(formula, api_key):
                 return None, "No MP entry found"
             doc = results[0]
             struct = doc.structure
-            # 智能判断：如果原子数较少，自动扩展为 2x2x2 超胞，让 3D 渲染饱满清晰
             if len(struct) < 25:
                 try:
                     struct.make_supercell([2, 2, 2])
@@ -367,7 +366,7 @@ if submit_button:
         st.stop()
 
     with st.spinner("Processing crystal structure and predicting..."):
-        # 1. 结构加载与 3D 渲染（已加入智能超胞）
+        # 1. 结构加载与 3D 渲染
         structure = None
         if (mp_key_input and not use_placeholder_checkbox) and (MPRester is not None):
             try:
