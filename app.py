@@ -109,16 +109,49 @@ formula_input = st.text_input("Enter Chemical Formula of the Material:", placeho
 # 提交按钮
 submit_button = st.button("Submit and Predict", key="predict_button")
 
-# 指定的描述符列表
-required_descriptors = [
-    'MagpieData mean CovalentRadius',
-    'Temp',
-    'MagpieData avg_dev SpaceGroupNumber',
-    '0-norm',
-    'MagpieData mean MeltingT',
-    'MagpieData avg_dev Column',
-    'MagpieData mean NValence'
-]
+# 根据不同的体系和电位类型，定义各自的特征描述符列表
+# （请将下面对应的特征名称替换为您实际训练该模型时所用的特征）
+descriptors_dict = {
+    "Li-containing compounds": {
+        "Oxidation potential": [
+            'mean Electronegativity	',
+            'mode Column',
+            'MagpieData avg_dev GSbandgap',
+            '0-norm',
+            'MagpieData mean MeltingT',
+            'MagpieData avg_dev Column',
+            'MagpieData mean NValence'
+        ],
+        "Reduction potential": [
+            # TODO: 请在此处填入【含Li时预测还原电位】的特征列表
+            'MagpieData mean CovalentRadius',
+            'Temp',
+            'MagpieData mean AtomicWeight',
+            '0-norm',
+            'MagpieData mean MeltingT'
+        ]
+    },
+    "Na-containing compounds": {
+        "Oxidation potential": [
+            # TODO: 请在此处填入【含Na时预测氧化电位】的特征列表
+            'MagpieData mean CovalentRadius',
+            'Temp',
+            'MagpieData avg_dev SpaceGroupNumber',
+            '0-norm',
+            'MagpieData mean MeltingT'
+        ],
+        "Reduction potential": [
+            # TODO: 请在此处填入【含Na时预测还原电位】的特征列表
+            'MagpieData mean CovalentRadius',
+            'Temp',
+            'MagpieData mean AtomicWeight',
+            '0-norm'
+        ]
+    }
+}
+
+# 当前选中的描述符列表会自动根据用户选择进行切换
+required_descriptors = descriptors_dict[electrolyte_system][prediction_target]
 
 # 缓存模型加载器
 @st.cache_resource(show_spinner=False, max_entries=4)
