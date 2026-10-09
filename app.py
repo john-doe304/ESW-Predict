@@ -1,5 +1,4 @@
 import streamlit as st
-import os
 from rdkit import Chem
 from rdkit.Chem import Descriptors, Draw, AllChem
 from rdkit.Chem.Draw import MolDraw2DSVG
@@ -15,18 +14,6 @@ import re
 from tqdm import tqdm 
 import numpy as np
 
-# 尝试导入 materials project 客户端
-try:
-    from mp_api.client import MPRester
-    from pymatgen.core import Structure
-    from matminer.featurizers.structure import (
-        DensityFeatures, GlobalSymmetryFeatures, StructuralHeterogeneity,
-        MaximumPackingEfficiency
-    )
-    MP_AVAILABLE = True
-except ImportError:
-    MP_AVAILABLE = False
-
 
 # 添加 CSS 样式
 st.markdown(
@@ -36,7 +23,7 @@ st.markdown(
         border: 2px solid #808080;
         border-radius: 20px;
         margin: 50px auto;
-        max-width: 45%;
+        max-width: 40%;
         background-color: #f9f9f9f9;
         padding: 20px;
         box-sizing: border-box;
@@ -80,7 +67,7 @@ st.markdown(
         <h2 style="font-size:22px;">Electrochemical Properties Prediction</h2>
         <blockquote>
             1. This web app predicts electrochemical potentials of solid-state electrolytes.<br>
-            2. Select system and target below, enter a chemical formula, and optionally provide your Materials Project API Key for 3D structure features.
+            2. Select the electrolyte system and target below, then enter a valid chemical formula string.
         </blockquote>
     </div>
     """,
@@ -100,25 +87,23 @@ with col2:
         ("Oxidation potential", "Reduction potential")
     )
 
-# 材料化学式与 MP API Key 输入
-col3, col4 = st.columns([2, 1])
-with col3:
-    if electrolyte_system == "Li-containing compounds":
-        example_formula = "e.g., Ba2Li3(PO3)7, Li7La3Zr2O12"
-        model_path = "./ag_20260729_025205" if prediction_target == "Oxidation potential" else "./ag-20260729_071442"
+# 根据选择动态调整模型路径与示例化学式
+if electrolyte_system == "Li-containing compounds":
+    system_name = "Li-containing compounds"
+    example_formula = "e.g., Ba2Li3(PO3)7, Li7La3Zr2O12, Li10GeP2S12"
+    if prediction_target == "Oxidation potential":
+        model_path = "./ag_20260729_025205"
     else:
-        example_formula = "e.g., Na5Zr2F13, Na2ZnO2"
-        model_path = "./ag-20260901_120910" if prediction_target == "Oxidation potential" else "./ag-20260901_120826"
-        
-    formula_input = st.text_input("Enter Chemical Formula:", placeholder=example_formula)
+        model_path = "./ag-20260729_071442"
+else:
+    system_name = "Na-containing compounds"
+    example_formula = "e.g., Na5Zr2F13, Na6ZnS4, Na2ZnO2"
+    if prediction_target == "Oxidation potential":
+        model_path = "./ag-20260901_120910"
+    else:
+        model_path = "./ag-20260901_120826"
 
-with col4:
-    mp_api_key = st.text_input("MP API Key (Optional):", type="password", help="Enter your Materials Project API key to fetch 3D crystal structure features like vpa_cif.")
-
-# 提交按钮
-submit_button = st.button("Submit and Predict", key="predict_button")
-
-# 特征描述符字典配置
+# 各模型对应的特征描述符列表（用于后端特征对齐）
 descriptors_dict = {
     "Li-containing compounds": {
         "Oxidation potential": [
@@ -160,31 +145,24 @@ descriptors_dict = {
 
 required_descriptors = descriptors_dict[electrolyte_system][prediction_target]
 
-# 缓存模型加载器
+# FORMULA 输入区域
+formula_input = st.text_input("Enter Chemical Formula of the Material:", placeholder=example_formula)
+
+# 提交按钮
+submit_button = st.button("Submit and Predict", key="predict_button")
+
+# 缓存模型加载器（加入 require_py_version_match=False 解决版本兼容问题）
 @st.cache_resource(show_spinner=False, max_entries=4)
 def load_predictor(path):
     return TabularPredictor.load(path, require_py_version_match=False)
 
 
-# 从 Materials Project 获取 3D 结构的函数
-def get_structure_from_mp(formula, api_key):
-    if not api_key or not MP_AVAILABLE:
-        return None
+# 材料特征计算函数（自动提取并对齐模型所需特征）
+def calculate_material_features(formula):
     try:
-        with MPRester(api_key) as mpr:
-            docs = mpr.materials.summary.search(formula=formula, fields=["material_id", "structure", "energy_per_atom"])
-            if docs:
-                docs = sorted(docs, key=lambda x: x.energy_per_atom)
-                return docs[0].structure
-    except Exception as e:
-        st.warning(f"Could not fetch structure from MP: {e}")
-    return None
-
-
-# 综合特征提取函数（支持组分特征 + 3D结构特征）
-def calculate_material_features(formula, api_key):
-    try:
-        from matminer.featurizers.composition import ElementProperty, Meredig, Stoichiometry
+        from matminer.featurizers.composition import (
+            ElementProperty, Meredig, Stoichiometry
+        )
         from matminer.featurizers.conversions import StrToComposition
 
         df = pd.DataFrame({'Formula': [formula]})
@@ -196,7 +174,6 @@ def calculate_material_features(formula, api_key):
 
         features = {'Formula': formula}
 
-        # 1. 提取组分特征
         ep = ElementProperty.from_preset('magpie')
         df = ep.featurize_dataframe(df, 'composition', ignore_errors=True)
 
@@ -205,21 +182,6 @@ def calculate_material_features(formula, api_key):
 
         sto = Stoichiometry()
         df = sto.featurize_dataframe(df, 'composition', ignore_errors=True)
-
-        # 2. 如果提供了 API Key 尝试提取 3D 结构特征
-        structure = get_structure_from_mp(formula, api_key)
-        if structure is not None:
-            df['structure'] = [structure]
-            try:
-                df_temp = DensityFeatures().featurize_dataframe(df[['structure']].copy(), 'structure', ignore_errors=True)
-                df_temp = df_temp.drop(columns=['structure']).rename(columns={'density': 'density_cif', 'vpa': 'vpa_cif'})
-                df = pd.concat([df, df_temp], axis=1)
-
-                df = GlobalSymmetryFeatures().featurize_dataframe(df, 'structure', ignore_errors=True)
-                df = StructuralHeterogeneity().featurize_dataframe(df, 'structure', ignore_errors=True)
-                df = MaximumPackingEfficiency().featurize_dataframe(df, 'structure', ignore_errors=True)
-            except Exception as struct_err:
-                st.info(f"Note: Structure feature extraction skipped: {struct_err}")
 
         numeric_columns = df.select_dtypes(include=[np.number]).columns
         for col in numeric_columns:
@@ -233,34 +195,15 @@ def calculate_material_features(formula, api_key):
         return {'Formula': formula}
 
 
-def filter_selected_features(features_dict, selected_descriptors):
-    filtered_features = {}
-    for feature_name in selected_descriptors:
-        if feature_name == 'Temp':
-            filtered_features[feature_name] = 298.0
-            continue
-        if feature_name in features_dict:
-            filtered_features[feature_name] = features_dict[feature_name]
-        else:
-            filtered_features[feature_name] = 0.0
-    return filtered_features
-
-
 if submit_button:
     if not formula_input:
         st.error("Please enter a valid chemical formula.")
     else:
-        with st.spinner("Processing material and making predictions..."):
+        with st.spinner("Processing and making predictions..."):
             try:
-                features = calculate_material_features(formula_input, mp_api_key)
-                st.write(f"✅ Total features extracted: {len(features)}")
+                # 后台计算特征
+                features = calculate_material_features(formula_input)
                 
-                selected_features = filter_selected_features(features, required_descriptors)
-                feature_df = pd.DataFrame([selected_features])
-                
-                st.subheader("Material Features")
-                st.dataframe(feature_df)
-            
                 if features:
                     input_data = {
                         "Formula": [formula_input],
@@ -274,12 +217,13 @@ if submit_button:
                         elif feature_name in features:
                             numeric_features[feature_name] = [features[feature_name]]
                         else:
-                            numeric_features[feature_name] = [0.0]
+                            numeric_features[feature_name] = [0.0]  # 结构特征默认补零供模型读取
                         
                     input_data.update(numeric_features)
                     input_df = pd.DataFrame(input_data)
                 
                 try:
+                    # 加载对应模型并预测
                     predictor = load_predictor(model_path)
                     
                     essential_models = ['CatBoost',
@@ -299,7 +243,8 @@ if submit_button:
                         except Exception as model_error:
                             predictions_dict[model] = "Error"
 
-                    st.write(f"Prediction Results for {electrolyte_system} - {prediction_target}:")
+                    # 直接展示最终预测结果
+                    st.write(f"### Prediction Results for {electrolyte_system} - {prediction_target}:")
                     st.markdown(
                         "**Note:** WeightedEnsemble_L2 is a meta-model combining predictions from other models.")
                     results_df = pd.DataFrame(predictions_dict)
