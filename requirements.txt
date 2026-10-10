@@ -8,3 +8,4 @@ matminer==0.9.3
 py3Dmol
 mp-api==0.33.3
 pydantic<2.0.0
+setuptools
