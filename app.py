@@ -132,7 +132,7 @@ st.markdown(
 st.markdown(
     """
     <div class='rounded-container'>
-        <h2 style="font-size:24px;">Electrochemical Properties Prediction</h2>
+        <h2 style="font-size:24px;">Oxidation potential and Reduction potential Prediction</h2>
         <blockquote>
             1. This web app predicts electrochemical potentials of solid-state electrolytes.<br>
             2. Select the electrolyte system and target below, then enter a valid chemical formula string.
