@@ -13,6 +13,7 @@ matminer==0.9.3
 
 mordred
 py3Dmol
+mp-api
 
 # Utilities
 requests
