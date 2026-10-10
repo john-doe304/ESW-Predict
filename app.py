@@ -1,5 +1,5 @@
 # -----------------------------------------------------------
-#   Electrochemical Properties Predictor (Clean Version)
+#   Electrochemical Properties Predictor (Debug Version)
 #   With Exact MP Crystal Rendering & Direct Prediction Output
 # -----------------------------------------------------------
 
@@ -38,15 +38,20 @@ except Exception:
     ElementProperty = Meredig = Stoichiometry = IonProperty = StrToComposition = CompositionToOxidComposition = None
 
 try:
-    from mp_api.client import MPRester
-except Exception:
-    MPRester = None
-
-try:
     from pymatgen.core import Structure, Lattice
     from pymatgen.io.cif import CifWriter
 except Exception:
     Structure = Lattice = CifWriter = None
+
+# ==========================================
+# 核心调试区域：捕获 mp-api 的真实报错信息
+# ==========================================
+mp_debug_info = ""
+try:
+    from mp_api.client import MPRester
+except Exception as e:
+    MPRester = None
+    mp_debug_info = traceback.format_exc()  # 抓取完整的底层报错日志
 
 st.set_page_config(layout="wide", page_title="Electrochemical Properties Predictor")
 
@@ -213,7 +218,7 @@ def load_predictor(path):
     return TabularPredictor.load(path, require_py_version_match=False)
 
 
-# ------------------------------- MP 结构加载 (恢复 100% 原始逻辑) -------------------------------
+# ------------------------------- MP 结构加载 -------------------------------
 def load_structure_from_mp(formula, api_key):
     if MPRester is None:
         return None, "mp-api not installed"
@@ -382,8 +387,13 @@ if submit_button:
                     st.warning(f"⚠️ Structure Fetch Failed: {info}")
             except Exception as e:
                 st.warning(f"⚠️ Materials Project API Error: {e}")
+        
+        # ⚠️ 这里是新加的排错逻辑！如果模块载入失败，展开报错内容。
         elif MPRester is None:
-            st.warning("⚠️ 'mp-api' library is missing. Cannot fetch real structure.")
+            st.warning("⚠️ 'mp-api' library failed to load. Cannot fetch real structure.")
+            if mp_debug_info:
+                with st.expander("🔍 点击展开查看真实的底层报错日志 (Debug Info)"):
+                    st.code(mp_debug_info)
 
         if structure is None:
             st.info("💡 Displaying placeholder unit cell since real structure could not be fetched.")
