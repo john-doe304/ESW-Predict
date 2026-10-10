@@ -1,6 +1,6 @@
 # -----------------------------------------------------------
 #   Electrochemical Properties Predictor (Clean Version)
-#   With MP Crystal 3D Rendering & Direct Prediction Output
+#   With Exact MP Crystal Rendering & Direct Prediction Output
 # -----------------------------------------------------------
 
 import streamlit as st
@@ -81,45 +81,44 @@ st.markdown(
     .stApp {
         border: 2px solid #808080;
         border-radius: 20px;
-        margin: 50px auto;
+        margin: 40px auto;
         max-width: 40%;
         background-color: #f9f9f9f9;
-        padding: 20px;
+        padding: 25px;
         box-sizing: border-box;
     }
+    .rounded-container {
+        margin-top: 10px;
+        margin-bottom: 25px;
+    }
     .rounded-container h2 {
-        margin-top: -80px;
+        margin-top: 0px; 
         text-align: center;
         background-color: #e0e0e0e0;
-        padding: 10px;
+        padding: 12px;
         border-radius: 10px;
     }
     .rounded-container blockquote {
         text-align: left;
         margin: 20px auto;
         background-color: #f0f0f0;
-        padding: 10px;
+        padding: 12px;
         font-size: 1.1em;
         border-radius: 10px;
     }
-    /* 减小指标卡片的字体大小 */
     .stMetric {
         font-size: 0.9em;
     }
-    /* 减小特征提取成功信息的字体大小 */
     .stWrite {
         font-size: 0.9em;
     }
-    /* 减小子标题的字体大小 */
     h3 {
         font-size: 1.2em;
         margin-bottom: 0.5em;
     }
-    /* 减小数据框的字体大小 */
     .dataframe {
         font-size: 0.8em;
     }
-    /* 调整结构和图例列之间的间距 */
     div[data-testid="column"] {
         padding: 0px !important;
     }
@@ -132,7 +131,7 @@ st.markdown(
 st.markdown(
     """
     <div class='rounded-container'>
-        <h2 style="font-size:24px;">Oxidation potential and Reduction potential Prediction</h2>
+        <h2 style="font-size:24px;">Electrochemical Properties Prediction</h2>
         <blockquote>
             1. This web app predicts electrochemical potentials of solid-state electrolytes.<br>
             2. Select the electrolyte system and target below, then enter a valid chemical formula string.
@@ -197,7 +196,7 @@ descriptors_dict = {
 
 required_descriptors = descriptors_dict[electrolyte_system][prediction_target]
 
-# 输入区域（化学式 + 提交按钮 + MP Key 选项）- UI 布局同步
+# 输入区域（化学式 + 提交按钮 + MP Key 选项）
 input_col1, input_col2 = st.columns([2, 1])
 with input_col1:
     formula_input = st.text_input("Enter Chemical Formula:", placeholder=example_formula)
@@ -214,8 +213,7 @@ def load_predictor(path):
     return TabularPredictor.load(path, require_py_version_match=False)
 
 
-# ------------------------------- MP 结构加载 (带超胞扩展) -------------------------------
-# ------------------------------- MP structure loader -------------------------------
+# ------------------------------- MP 结构加载 (恢复 100% 原始逻辑) -------------------------------
 def load_structure_from_mp(formula, api_key):
     if MPRester is None:
         return None, "mp-api not installed"
@@ -236,7 +234,8 @@ def load_structure_from_mp(formula, api_key):
     except Exception as e:
         return None, f"MP error: {e}"
 
-# ------------------------------- Placeholder cell generator -------------------------------
+
+# ------------------------------- 占位晶胞生成 -------------------------------
 def generate_placeholder_structure(formula):
     elems = re.findall(r"[A-Z][a-z]?", formula or "")
     elems = list(dict.fromkeys(elems))
@@ -247,16 +246,15 @@ def generate_placeholder_structure(formula):
     for i in range(n):
         coords.append([0.1 + 0.8*((i+1)/(n+1)), 0.1 + 0.6*random.random(), 0.1 + 0.6*random.random()])
     if Lattice is None or Structure is None:
-        st.warning("pymatgen not installed — cannot create placeholder Structure.")
         return None
     lattice = Lattice.cubic(10.0)
     struct = Structure(lattice, elems, coords)
     return struct
 
-# ------------------------------- Structure -> CIF string (robust) -------------------------------
+
+# ------------------------------- 结构转 CIF 字符串 -------------------------------
 def structure_to_cif_string(structure):
     if CifWriter is None:
-        st.warning("pymatgen.io.cif.CifWriter not available.")
         return None
     tmp = None
     try:
@@ -264,11 +262,8 @@ def structure_to_cif_string(structure):
             fname = tmp.name
         try:
             CifWriter(structure).write_file(fname)
-        except Exception as e:
-            try:
-                structure.to(filename=fname)
-            except Exception:
-                raise e
+        except Exception:
+            structure.to(filename=fname)
         with open(fname, "r", encoding="utf-8") as f:
             cif_str = f.read()
         return cif_str
@@ -279,7 +274,8 @@ def structure_to_cif_string(structure):
         except Exception:
             pass
 
-# ------------------------------- Render structure to HTML for Streamlit -------------------------------
+
+# ------------------------------- py3Dmol 结构渲染 -------------------------------
 def render_structure_with_legend(structure, width=520, height=260):
     cif_str = structure_to_cif_string(structure)
     if not cif_str:
@@ -306,40 +302,20 @@ def render_structure_with_legend(structure, width=520, height=260):
         c = MP_COLORS.get(el, "#9E9E9E")
         legend_items += f"""
         <div style="display:flex;align-items:center;margin-bottom:6px;">
-            <div style="
-                width:14px;
-                height:14px;
-                background:{c};
-                border:1px solid #333;
-                border-radius:3px;
-                margin-right:6px;
-            "></div>
+            <div style="width:14px;height:14px;background:{c};border:1px solid #333;border-radius:3px;margin-right:6px;"></div>
             <span style="font-size:13px;color:#222;">{el}</span>
         </div>
         """
 
     legend_html = f"""
-    <div style="
-        background:#f5f5f5;
-        border:1px solid #ccc;
-        border-radius:8px;
-        padding:10px;
-        width:120px;
-    ">
-        <div style="text-align:center;font-weight:600;margin-bottom:8px;">
-            Element colors
-        </div>
+    <div style="background:#f5f5f5;border:1px solid #ccc;border-radius:8px;padding:10px;width:120px;">
+        <div style="text-align:center;font-weight:600;margin-bottom:8px;">Element colors</div>
         {legend_items}
     </div>
     """
 
     final_html = f"""
-    <div style="
-        display:flex;
-        align-items:flex-start;
-        gap:12px;
-        width:{width}px;
-    ">
+    <div style="display:flex;align-items:flex-start;gap:12px;width:{width}px;">
         <div>{structure_html}</div>
         {legend_html}
     </div>
@@ -402,10 +378,15 @@ if submit_button:
                 struct, info = load_structure_from_mp(formula_input, mp_key_input)
                 if struct:
                     structure = struct
-            except Exception:
-                pass
+                else:
+                    st.warning(f"⚠️ Structure Fetch Failed: {info}")
+            except Exception as e:
+                st.warning(f"⚠️ Materials Project API Error: {e}")
+        elif MPRester is None:
+            st.warning("⚠️ 'mp-api' library is missing. Cannot fetch real structure.")
 
         if structure is None:
+            st.info("💡 Displaying placeholder unit cell since real structure could not be fetched.")
             structure = generate_placeholder_structure(formula_input)
 
         if structure:
