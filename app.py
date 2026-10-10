@@ -209,7 +209,7 @@ def load_predictor(path):
     return TabularPredictor.load(path, require_py_version_match=False)
 
 
-# ------------------------------- 彻底抛弃 mp-api 的原生请求结构加载器 (修复 400 报错) -------------------------------
+# ------------------------------- 彻底抛弃 mp-api 的原生请求结构加载器 (终极修复版) -------------------------------
 def load_structure_from_mp(formula, api_key):
     if not api_key:
         return None, "No API key provided."
@@ -220,8 +220,11 @@ def load_structure_from_mp(formula, api_key):
         url = "https://api.materialsproject.org/materials/summary/"
         headers = {"X-API-KEY": api_key}
         
-        # 【核心修复点】去掉 "fields" 参数，直接请求所有默认数据，避免 MP API 报错 HTTP 400
-        params = {"formula": formula}
+        # 【核心修复点】新版 API 过滤字段必须加下划线 _fields，否则为了节省流量默认不返回 structure
+        params = {
+            "formula": formula,
+            "_fields": "structure,material_id"
+        }
         
         response = requests.get(url, headers=headers, params=params, timeout=15)
         
