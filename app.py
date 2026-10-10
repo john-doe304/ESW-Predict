@@ -215,12 +215,16 @@ def load_predictor(path):
 
 
 # ------------------------------- MP 结构加载 (带超胞扩展) -------------------------------
+# ------------------------------- MP structure loader -------------------------------
 def load_structure_from_mp(formula, api_key):
     if MPRester is None:
         return None, "mp-api not installed"
     try:
         with MPRester(api_key) as mpr:
-            results = mpr.summary.search(formula=formula, fields=["structure"])
+            results = mpr.summary.search(
+                formula=formula, 
+                fields=["structure"]
+            )
             if not results:
                 return None, "No MP entry found"
             doc = results[0]
@@ -228,19 +232,11 @@ def load_structure_from_mp(formula, api_key):
                 struct = doc.structure.get_primitive_structure()
             except Exception:
                 struct = doc.structure
-            
-            # 智能判断：如果原子数较少，自动扩展为超胞
-            if len(struct) < 25:
-                try:
-                    struct.make_supercell([2, 2, 2])
-                except Exception:
-                    pass
-            return struct, "Successfully loaded from MP"
+            return struct, "Successfully loaded from MP" 
     except Exception as e:
         return None, f"MP error: {e}"
 
-
-# ------------------------------- 占位晶胞生成 -------------------------------
+# ------------------------------- Placeholder cell generator -------------------------------
 def generate_placeholder_structure(formula):
     elems = re.findall(r"[A-Z][a-z]?", formula or "")
     elems = list(dict.fromkeys(elems))
@@ -251,15 +247,16 @@ def generate_placeholder_structure(formula):
     for i in range(n):
         coords.append([0.1 + 0.8*((i+1)/(n+1)), 0.1 + 0.6*random.random(), 0.1 + 0.6*random.random()])
     if Lattice is None or Structure is None:
+        st.warning("pymatgen not installed — cannot create placeholder Structure.")
         return None
     lattice = Lattice.cubic(10.0)
     struct = Structure(lattice, elems, coords)
     return struct
 
-
-# ------------------------------- 结构转 CIF 字符串 -------------------------------
+# ------------------------------- Structure -> CIF string (robust) -------------------------------
 def structure_to_cif_string(structure):
     if CifWriter is None:
+        st.warning("pymatgen.io.cif.CifWriter not available.")
         return None
     tmp = None
     try:
@@ -267,8 +264,11 @@ def structure_to_cif_string(structure):
             fname = tmp.name
         try:
             CifWriter(structure).write_file(fname)
-        except Exception:
-            structure.to(filename=fname)
+        except Exception as e:
+            try:
+                structure.to(filename=fname)
+            except Exception:
+                raise e
         with open(fname, "r", encoding="utf-8") as f:
             cif_str = f.read()
         return cif_str
@@ -279,8 +279,7 @@ def structure_to_cif_string(structure):
         except Exception:
             pass
 
-
-# ------------------------------- py3Dmol 结构渲染 -------------------------------
+# ------------------------------- Render structure to HTML for Streamlit -------------------------------
 def render_structure_with_legend(structure, width=520, height=260):
     cif_str = structure_to_cif_string(structure)
     if not cif_str:
@@ -307,20 +306,40 @@ def render_structure_with_legend(structure, width=520, height=260):
         c = MP_COLORS.get(el, "#9E9E9E")
         legend_items += f"""
         <div style="display:flex;align-items:center;margin-bottom:6px;">
-            <div style="width:14px;height:14px;background:{c};border:1px solid #333;border-radius:3px;margin-right:6px;"></div>
+            <div style="
+                width:14px;
+                height:14px;
+                background:{c};
+                border:1px solid #333;
+                border-radius:3px;
+                margin-right:6px;
+            "></div>
             <span style="font-size:13px;color:#222;">{el}</span>
         </div>
         """
 
     legend_html = f"""
-    <div style="background:#f5f5f5;border:1px solid #ccc;border-radius:8px;padding:10px;width:120px;">
-        <div style="text-align:center;font-weight:600;margin-bottom:8px;">Colors</div>
+    <div style="
+        background:#f5f5f5;
+        border:1px solid #ccc;
+        border-radius:8px;
+        padding:10px;
+        width:120px;
+    ">
+        <div style="text-align:center;font-weight:600;margin-bottom:8px;">
+            Element colors
+        </div>
         {legend_items}
     </div>
     """
 
     final_html = f"""
-    <div style="display:flex;align-items:flex-start;gap:12px;width:{width}px;">
+    <div style="
+        display:flex;
+        align-items:flex-start;
+        gap:12px;
+        width:{width}px;
+    ">
         <div>{structure_html}</div>
         {legend_html}
     </div>
