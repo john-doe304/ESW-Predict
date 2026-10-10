@@ -1,6 +1,6 @@
 # -----------------------------------------------------------
-#   Electrochemical Properties Predictor (Clean Version)
-#   With MP Crystal 3D Rendering & Direct Prediction Output
+#   Electrochemical Properties Predictor (Ultimate Bypass Version)
+#   Direct HTTP Request to MP API (No mp-api package needed!)
 # -----------------------------------------------------------
 
 import streamlit as st
@@ -14,6 +14,7 @@ import re
 import tempfile
 import os
 import random
+import requests  # 引入原生请求库
 from io import BytesIO
 import base64
 
@@ -36,11 +37,6 @@ try:
     from matminer.featurizers.conversions import StrToComposition, CompositionToOxidComposition
 except Exception:
     ElementProperty = Meredig = Stoichiometry = IonProperty = StrToComposition = CompositionToOxidComposition = None
-
-try:
-    from mp_api.client import MPRester
-except Exception:
-    MPRester = None
 
 try:
     from pymatgen.core import Structure, Lattice
@@ -81,45 +77,44 @@ st.markdown(
     .stApp {
         border: 2px solid #808080;
         border-radius: 20px;
-        margin: 50px auto;
+        margin: 40px auto;
         max-width: 40%;
         background-color: #f9f9f9f9;
-        padding: 20px;
+        padding: 25px;
         box-sizing: border-box;
     }
+    .rounded-container {
+        margin-top: 10px;
+        margin-bottom: 25px;
+    }
     .rounded-container h2 {
-        margin-top: -80px;
+        margin-top: 0px; 
         text-align: center;
         background-color: #e0e0e0e0;
-        padding: 10px;
+        padding: 12px;
         border-radius: 10px;
     }
     .rounded-container blockquote {
         text-align: left;
         margin: 20px auto;
         background-color: #f0f0f0;
-        padding: 10px;
+        padding: 12px;
         font-size: 1.1em;
         border-radius: 10px;
     }
-    /* 减小指标卡片的字体大小 */
     .stMetric {
         font-size: 0.9em;
     }
-    /* 减小特征提取成功信息的字体大小 */
     .stWrite {
         font-size: 0.9em;
     }
-    /* 减小子标题的字体大小 */
     h3 {
         font-size: 1.2em;
         margin-bottom: 0.5em;
     }
-    /* 减小数据框的字体大小 */
     .dataframe {
         font-size: 0.8em;
     }
-    /* 调整结构和图例列之间的间距 */
     div[data-testid="column"] {
         padding: 0px !important;
     }
@@ -142,7 +137,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# 选择体系与预测目标 (直接并排)
+# 选择体系与预测目标
 col_sys, col_tar = st.columns(2)
 with col_sys:
     electrolyte_system = st.selectbox(
@@ -155,7 +150,7 @@ with col_tar:
         ("Oxidation potential", "Reduction potential")
     )
 
-# 根据选择动态调整模型路径、示例化学式与特征描述符
+# 根据选择动态调整模型路径
 if electrolyte_system == "Li-containing compounds":
     example_formula = "e.g., Ba2Li3(PO3)7, Li7La3Zr2O12, Li10GeP2S12"
     if prediction_target == "Oxidation potential":
@@ -197,7 +192,7 @@ descriptors_dict = {
 
 required_descriptors = descriptors_dict[electrolyte_system][prediction_target]
 
-# 输入区域（化学式 + 提交按钮 + MP Key 选项）- UI 布局同步
+# 输入区域（化学式 + 提交按钮 + MP Key 选项）
 input_col1, input_col2 = st.columns([2, 1])
 with input_col1:
     formula_input = st.text_input("Enter Chemical Formula:", placeholder=example_formula)
@@ -214,30 +209,51 @@ def load_predictor(path):
     return TabularPredictor.load(path, require_py_version_match=False)
 
 
-# ------------------------------- MP 结构加载 (带超胞扩展) -------------------------------
+# ------------------------------- 彻底抛弃 mp-api 的原生请求结构加载器 -------------------------------
 def load_structure_from_mp(formula, api_key):
-    if MPRester is None:
-        return None, "mp-api not installed"
+    if not api_key:
+        return None, "No API key provided."
+    if Structure is None:
+        return None, "pymatgen is not installed."
+        
     try:
-        with MPRester(api_key) as mpr:
-            results = mpr.summary.search(formula=formula, fields=["structure"])
-            if not results:
-                return None, "No MP entry found"
-            doc = results[0]
-            try:
-                struct = doc.structure.get_primitive_structure()
-            except Exception:
-                struct = doc.structure
+        # 直接通过原生 requests 调用 MP 官方底层 REST API，绕开包版本冲突！
+        url = "https://api.materialsproject.org/materials/summary/"
+        headers = {"X-API-KEY": api_key}
+        params = {"formula": formula, "fields": "structure"}
+        
+        response = requests.get(url, headers=headers, params=params, timeout=15)
+        
+        if response.status_code == 200:
+            data = response.json().get("data", [])
+            if not data:
+                return None, "No entry found for this formula."
             
+            struct_dict = data[0].get("structure")
+            if not struct_dict:
+                return None, "Structure data missing in MP response."
+            
+            # 使用 pymatgen 直接把返回的字典解析为晶体结构对象
+            struct = Structure.from_dict(struct_dict)
+            
+            try:
+                struct = struct.get_primitive_structure()
+            except Exception:
+                pass
+                
             # 智能判断：如果原子数较少，自动扩展为超胞
             if len(struct) < 25:
                 try:
                     struct.make_supercell([2, 2, 2])
                 except Exception:
                     pass
-            return struct, "Successfully loaded from MP"
+                    
+            return struct, "Successfully loaded from MP via REST API"
+        else:
+            return None, f"HTTP Error {response.status_code}: {response.text}"
+            
     except Exception as e:
-        return None, f"MP error: {e}"
+        return None, f"Request Error: {e}"
 
 
 # ------------------------------- 占位晶胞生成 -------------------------------
@@ -314,7 +330,7 @@ def render_structure_with_legend(structure, width=520, height=260):
 
     legend_html = f"""
     <div style="background:#f5f5f5;border:1px solid #ccc;border-radius:8px;padding:10px;width:120px;">
-        <div style="text-align:center;font-weight:600;margin-bottom:8px;">Colors</div>
+        <div style="text-align:center;font-weight:600;margin-bottom:8px;">Element colors</div>
         {legend_items}
     </div>
     """
@@ -376,17 +392,17 @@ if submit_button:
         st.stop()
 
     with st.spinner("Processing crystal structure and predicting..."):
-        # 1. 结构加载与 3D 渲染
+        # 1. 结构加载与 3D 渲染 (无需依赖 mp-api)
         structure = None
-        if (mp_key_input and not use_placeholder_checkbox) and (MPRester is not None):
-            try:
-                struct, info = load_structure_from_mp(formula_input, mp_key_input)
-                if struct:
-                    structure = struct
-            except Exception:
-                pass
-
+        if (mp_key_input and not use_placeholder_checkbox):
+            struct, info = load_structure_from_mp(formula_input, mp_key_input)
+            if struct:
+                structure = struct
+            else:
+                st.warning(f"⚠️ Structure Fetch Failed: {info}")
+        
         if structure is None:
+            st.info("💡 Displaying placeholder unit cell since real structure could not be fetched.")
             structure = generate_placeholder_structure(formula_input)
 
         if structure:
