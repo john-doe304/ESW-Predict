@@ -209,7 +209,7 @@ def load_predictor(path):
     return TabularPredictor.load(path, require_py_version_match=False)
 
 
-# ------------------------------- 彻底抛弃 mp-api 的原生请求结构加载器 -------------------------------
+# ------------------------------- 彻底抛弃 mp-api 的原生请求结构加载器 (修复 400 报错) -------------------------------
 def load_structure_from_mp(formula, api_key):
     if not api_key:
         return None, "No API key provided."
@@ -217,10 +217,11 @@ def load_structure_from_mp(formula, api_key):
         return None, "pymatgen is not installed."
         
     try:
-        # 直接通过原生 requests 调用 MP 官方底层 REST API，绕开包版本冲突！
         url = "https://api.materialsproject.org/materials/summary/"
         headers = {"X-API-KEY": api_key}
-        params = {"formula": formula, "fields": "structure"}
+        
+        # 【核心修复点】去掉 "fields" 参数，直接请求所有默认数据，避免 MP API 报错 HTTP 400
+        params = {"formula": formula}
         
         response = requests.get(url, headers=headers, params=params, timeout=15)
         
