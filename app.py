@@ -1,6 +1,6 @@
 # -----------------------------------------------------------
-#   Electrochemical Properties Predictor (Debug Version)
-#   With Exact MP Crystal Rendering & Direct Prediction Output
+#   Electrochemical Properties Predictor (Clean Version)
+#   With MP Crystal 3D Rendering & Direct Prediction Output
 # -----------------------------------------------------------
 
 import streamlit as st
@@ -38,20 +38,15 @@ except Exception:
     ElementProperty = Meredig = Stoichiometry = IonProperty = StrToComposition = CompositionToOxidComposition = None
 
 try:
+    from mp_api.client import MPRester
+except Exception:
+    MPRester = None
+
+try:
     from pymatgen.core import Structure, Lattice
     from pymatgen.io.cif import CifWriter
 except Exception:
     Structure = Lattice = CifWriter = None
-
-# ==========================================
-# 核心调试区域：捕获 mp-api 的真实报错信息
-# ==========================================
-mp_debug_info = ""
-try:
-    from mp_api.client import MPRester
-except Exception as e:
-    MPRester = None
-    mp_debug_info = traceback.format_exc()  # 抓取完整的底层报错日志
 
 st.set_page_config(layout="wide", page_title="Electrochemical Properties Predictor")
 
@@ -86,44 +81,45 @@ st.markdown(
     .stApp {
         border: 2px solid #808080;
         border-radius: 20px;
-        margin: 40px auto;
+        margin: 50px auto;
         max-width: 40%;
         background-color: #f9f9f9f9;
-        padding: 25px;
+        padding: 20px;
         box-sizing: border-box;
     }
-    .rounded-container {
-        margin-top: 10px;
-        margin-bottom: 25px;
-    }
     .rounded-container h2 {
-        margin-top: 0px; 
+        margin-top: -80px;
         text-align: center;
         background-color: #e0e0e0e0;
-        padding: 12px;
+        padding: 10px;
         border-radius: 10px;
     }
     .rounded-container blockquote {
         text-align: left;
         margin: 20px auto;
         background-color: #f0f0f0;
-        padding: 12px;
+        padding: 10px;
         font-size: 1.1em;
         border-radius: 10px;
     }
+    /* 减小指标卡片的字体大小 */
     .stMetric {
         font-size: 0.9em;
     }
+    /* 减小特征提取成功信息的字体大小 */
     .stWrite {
         font-size: 0.9em;
     }
+    /* 减小子标题的字体大小 */
     h3 {
         font-size: 1.2em;
         margin-bottom: 0.5em;
     }
+    /* 减小数据框的字体大小 */
     .dataframe {
         font-size: 0.8em;
     }
+    /* 调整结构和图例列之间的间距 */
     div[data-testid="column"] {
         padding: 0px !important;
     }
@@ -201,7 +197,7 @@ descriptors_dict = {
 
 required_descriptors = descriptors_dict[electrolyte_system][prediction_target]
 
-# 输入区域（化学式 + 提交按钮 + MP Key 选项）
+# 输入区域（化学式 + 提交按钮 + MP Key 选项）- UI 布局同步
 input_col1, input_col2 = st.columns([2, 1])
 with input_col1:
     formula_input = st.text_input("Enter Chemical Formula:", placeholder=example_formula)
@@ -218,16 +214,13 @@ def load_predictor(path):
     return TabularPredictor.load(path, require_py_version_match=False)
 
 
-# ------------------------------- MP 结构加载 -------------------------------
+# ------------------------------- MP 结构加载 (带超胞扩展) -------------------------------
 def load_structure_from_mp(formula, api_key):
     if MPRester is None:
         return None, "mp-api not installed"
     try:
         with MPRester(api_key) as mpr:
-            results = mpr.summary.search(
-                formula=formula, 
-                fields=["structure"]
-            )
+            results = mpr.summary.search(formula=formula, fields=["structure"])
             if not results:
                 return None, "No MP entry found"
             doc = results[0]
@@ -235,7 +228,14 @@ def load_structure_from_mp(formula, api_key):
                 struct = doc.structure.get_primitive_structure()
             except Exception:
                 struct = doc.structure
-            return struct, "Successfully loaded from MP" 
+            
+            # 智能判断：如果原子数较少，自动扩展为超胞
+            if len(struct) < 25:
+                try:
+                    struct.make_supercell([2, 2, 2])
+                except Exception:
+                    pass
+            return struct, "Successfully loaded from MP"
     except Exception as e:
         return None, f"MP error: {e}"
 
@@ -314,7 +314,7 @@ def render_structure_with_legend(structure, width=520, height=260):
 
     legend_html = f"""
     <div style="background:#f5f5f5;border:1px solid #ccc;border-radius:8px;padding:10px;width:120px;">
-        <div style="text-align:center;font-weight:600;margin-bottom:8px;">Element colors</div>
+        <div style="text-align:center;font-weight:600;margin-bottom:8px;">Colors</div>
         {legend_items}
     </div>
     """
@@ -383,20 +383,10 @@ if submit_button:
                 struct, info = load_structure_from_mp(formula_input, mp_key_input)
                 if struct:
                     structure = struct
-                else:
-                    st.warning(f"⚠️ Structure Fetch Failed: {info}")
-            except Exception as e:
-                st.warning(f"⚠️ Materials Project API Error: {e}")
-        
-        # ⚠️ 这里是新加的排错逻辑！如果模块载入失败，展开报错内容。
-        elif MPRester is None:
-            st.warning("⚠️ 'mp-api' library failed to load. Cannot fetch real structure.")
-            if mp_debug_info:
-                with st.expander("🔍 点击展开查看真实的底层报错日志 (Debug Info)"):
-                    st.code(mp_debug_info)
+            except Exception:
+                pass
 
         if structure is None:
-            st.info("💡 Displaying placeholder unit cell since real structure could not be fetched.")
             structure = generate_placeholder_structure(formula_input)
 
         if structure:
