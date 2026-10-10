@@ -11,6 +11,10 @@ pillow==10.4.0
 pymatgen==2023.9.10
 matminer==0.9.3
 
+# 锁定底层依赖，彻底解决真实晶体无法下载/渲染的冲突
+mp-api==0.30.0
+pydantic<2.0.0
+
 mordred
 py3Dmol
 
